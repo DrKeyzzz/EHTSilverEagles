@@ -1,0 +1,35 @@
+name: Refresh NJ Scores
+
+# Manual button only -- no schedule. This runs on GitHub's servers, not on
+# anyone's computer, so anyone with write access can click "Run workflow" on
+# the Actions tab to pull the latest scores from usbands.org, with no local
+# setup (no terminal, no Python, no git).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scrape usbands.org and rebuild index.html
+        run: |
+          python3 scraper.py > /tmp/nj_data.json
+          python3 build_site.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && echo "No changes." && exit 0
+          git commit -m "Refresh NJ scores $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
