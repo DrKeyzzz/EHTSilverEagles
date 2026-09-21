@@ -10,4 +10,4 @@ git add index.html
 git diff --cached --quiet && { echo "No changes."; exit 0; }
 git commit -m "Refresh NJ scores $(date -u +%Y-%m-%dT%H:%MZ)"
 git push
-echo "Pushed. Live at https://drkeyzzz.github.io/nj-marching-scores/ (may take ~1 min to update)."
+echo "Pushed. Live at https://drkeyzzz.github.io/EHTSilverEagles/ (may take ~1 min to update)."
