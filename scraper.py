@@ -20,15 +20,11 @@ USER_AGENT = (
     "run manually, not a crawler)"
 )
 
-CARD_RE = re.compile(
-    r'<div class="card shadow mb-3 bg-white border-0 shadow" id="event-(?P<id>\d+)" '
-    r'data-time="(?P<epoch>\d+)">.*?'
-    r'<div class="event(?P<past>\s+past)?">'
-    r'(?:<span class="checkmark[^"]*">[^<]*</span>)?'
-    r'<a href="details\.php\?ID=\d+"[^>]*class="eventtitle""?\s*>(?P<name>.*?)</a>\s*'
-    r'<div class="location">\s*(?P<location>.*?)</div>',
-    re.DOTALL,
-)
+CARD_SPLIT_RE = re.compile(r'<div class="card shadow mb-3[^"]*" id="event-')
+CARD_ID_RE = re.compile(r'^(?P<id>\d+)" data-time="(?P<epoch>\d+)"')
+CARD_PAST_RE = re.compile(r'<div class="event(?P<past>\s+past)?')
+CARD_NAME_RE = re.compile(r'<a [^>]*class="eventtitle[^>]*>(?P<name>.*?)</a>', re.DOTALL)
+CARD_LOC_RE = re.compile(r'<div class="location">\s*(?P<location>.*?)</div>', re.DOTALL)
 
 TITLE_RE = re.compile(r'<h1 class="text-white mb-2 event-title">(.*?)</h1>', re.DOTALL)
 DATE_RE = re.compile(r'calendar\.svg[^>]*/>\s*([^<]+?)\s*</div>')
@@ -99,14 +95,20 @@ class EventDetail:
 def fetch_event_list() -> list[EventSummary]:
     html_text = _fetch(EVENTS_URL)
     events = []
-    for m in CARD_RE.finditer(html_text):
+    for block in CARD_SPLIT_RE.split(html_text)[1:]:
+        id_m = CARD_ID_RE.match(block)
+        name_m = CARD_NAME_RE.search(block)
+        loc_m = CARD_LOC_RE.search(block)
+        if not (id_m and name_m and loc_m):
+            continue
+        past_m = CARD_PAST_RE.search(block)
         events.append(
             EventSummary(
-                id=int(m.group("id")),
-                name=_clean(m.group("name")),
-                location=_clean(m.group("location")),
-                epoch=int(m.group("epoch")),
-                is_past=bool(m.group("past")),
+                id=int(id_m.group("id")),
+                name=_clean(re.sub(r"<[^>]+>", "", name_m.group("name"))),
+                location=_clean(loc_m.group("location")),
+                epoch=int(id_m.group("epoch")),
+                is_past=bool(past_m and past_m.group("past")),
             )
         )
     return events

@@ -130,6 +130,19 @@ TEMPLATE = """<!doctype html>
     white-space: nowrap;
   }
   .snapshot-chip b { color: var(--text); font-weight: 600; }
+  .masthead-side { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .update-btn {
+    font-family: "Inter", -apple-system, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--brass);
+    border-radius: 100px;
+    padding: 8px 16px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .update-btn:hover, .update-btn:focus-visible { filter: brightness(1.1); outline: 2px solid var(--text); outline-offset: 2px; }
 
   .tracker-panel {
     background: var(--surface-2);
@@ -148,6 +161,18 @@ TEMPLATE = """<!doctype html>
     color: var(--brass);
     margin-bottom: 10px;
   }
+  .tracker-weekend {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 14px 0 4px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--border);
+  }
+  .tracker-title + .tracker-weekend { margin-top: 0; }
   .tracker-row {
     padding: 10px 6px;
     border-bottom: 1px solid var(--border);
@@ -356,7 +381,10 @@ TEMPLATE = """<!doctype html>
       <p class="eyebrow">2026 Season &middot; New Jersey</p>
       <h1>Marching Scores</h1>
     </div>
-    <div class="snapshot-chip">Snapshot: <b id="fetchedAt">&mdash;</b></div>
+    <div class="masthead-side">
+      <div class="snapshot-chip">Snapshot: <b id="fetchedAt">&mdash;</b></div>
+      <a class="update-btn" href="https://github.com/DrKeyzzz/EHTSilverEagles/actions/workflows/refresh.yml" target="_blank" rel="noopener">Update scores &#8599;</a>
+    </div>
   </div>
 
   <div class="tracker-panel" id="tracker"></div>
@@ -468,7 +496,14 @@ function renderTracker() {
     panel.innerHTML = title + `<div class="empty-msg">No ${escapeHtml(TRACKED_DIVISION)} scores posted yet this season.</div>`;
     return;
   }
-  const body = rows.map((r, i) => {
+  const groups = [];
+  for (const r of rows) {
+    let g = groups.find(x => x.date === r.date);
+    if (!g) { g = { date: r.date, epoch: r.epoch, rows: [] }; groups.push(g); }
+    g.rows.push(r);
+  }
+  groups.sort((a, b) => b.epoch - a.epoch);
+  const renderRow = (r, i) => {
     const place = i + 1;
     const isUs = r.band.toLowerCase().includes(HIGHLIGHT_TERM);
     const medalClass = place <= 3 ? ` rank-${place}` : '';
@@ -484,7 +519,10 @@ function renderTracker() {
         <div class="tracker-meta">${escapeHtml(r.eventName)} &middot; ${escapeHtml(r.date)}</div>
       </div>
     `;
-  }).join('');
+  };
+  const body = groups.map(g =>
+    `<div class="tracker-weekend">${escapeHtml(g.date)}</div>` + g.rows.map(renderRow).join('')
+  ).join('');
   panel.innerHTML = title + body;
 }
 
