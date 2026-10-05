@@ -161,6 +161,8 @@ TEMPLATE = """<!doctype html>
     color: var(--brass);
     margin-bottom: 10px;
   }
+  .band-link { color: inherit; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+  .band-link:hover, .band-link:focus-visible { text-decoration-color: currentColor; }
   .tracker-weekend {
     font-family: "IBM Plex Mono", monospace;
     font-size: 0.74rem;
@@ -414,6 +416,11 @@ function escapeHtml(s) {
   }[c]));
 }
 
+function bandLink(name, uid) {
+  if (!uid) return escapeHtml(name);
+  return `<a class="band-link" href="https://usbands.org/units/details.php?ID=${uid}&season=2026" target="_blank" rel="noopener">${escapeHtml(name)}</a>`;
+}
+
 function fmtFetchedAt(iso) {
   if (!iso) return 'unknown';
   const d = new Date(iso);
@@ -446,7 +453,7 @@ function renderEvent(ev) {
       const rows = div.results.map(r => `
         <tr class="rank-${r.rank}">
           <td class="rank">${r.rank}</td>
-          <td class="band">${escapeHtml(r.band)}</td>
+          <td class="band">${bandLink(r.band, r.unit_id)}</td>
           <td class="score num">${r.score.toFixed(1)}</td>
         </tr>
       `).join('');
@@ -478,7 +485,7 @@ function buildTrackerRows() {
     for (const div of (ev.divisions || [])) {
       if (normDivision(div.name) === normDivision(TRACKED_DIVISION)) {
         for (const r of div.results) {
-          rows.push({ epoch: ev.epoch, date: ev.date, eventName: ev.name, band: r.band, score: r.score });
+          rows.push({ epoch: ev.epoch, date: ev.date, eventName: ev.name, band: r.band, unit_id: r.unit_id, score: r.score });
         }
       }
     }
@@ -512,7 +519,7 @@ function renderTracker() {
         <div class="tracker-main">
           <div class="tracker-band">
             <span class="tracker-rank">${place}</span>
-            <span class="tracker-band-name">${escapeHtml(r.band)}</span>
+            <span class="tracker-band-name">${bandLink(r.band, r.unit_id)}</span>
           </div>
           <span class="tracker-score">${r.score.toFixed(1)}</span>
         </div>

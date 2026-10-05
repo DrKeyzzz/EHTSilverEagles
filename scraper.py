@@ -37,7 +37,7 @@ DIVISION_NAME_RE = re.compile(r'<div class="scores-division__name">(.*?)</div>',
 ROW_RE = re.compile(
     r'<div class="scores-cell scores-rank"><span class="rank-num">(?P<rank>\d+)</span></div>'
     r'<div class="scores-cell scores-band">'
-    r'(?:<a[^>]*>(?P<band_a>.*?)</a>|<div class="band-name">(?P<band_div>.*?)</div>|(?P<band_plain>[^<]*))'
+    r'(?:<a(?P<a_attrs>[^>]*)>(?P<band_a>.*?)</a>|<div class="band-name">(?P<band_div>.*?)</div>|(?P<band_plain>[^<]*))'
     r'</div>'
     r'<div class="scores-cell scores-score">(?P<score>[\d.]+)</div>',
     re.DOTALL,
@@ -59,6 +59,7 @@ class ScoreRow:
     rank: int
     band: str
     score: float
+    unit_id: int | None = None
 
 
 @dataclass
@@ -162,11 +163,13 @@ def fetch_event_detail(summary: EventSummary) -> EventDetail:
             division = Division(name=_clean(name_m.group(1)))
             for row_m in ROW_RE.finditer(chunk):
                 band = row_m.group("band_a") or row_m.group("band_div") or row_m.group("band_plain") or ""
+                uid_m = re.search(r'data-unit-id="(\d+)"', row_m.group("a_attrs") or "")
                 division.results.append(
                     ScoreRow(
                         rank=int(row_m.group("rank")),
                         band=_clean(band),
                         score=float(row_m.group("score")),
+                        unit_id=int(uid_m.group(1)) if uid_m else None,
                     )
                 )
             if division.results:
