@@ -141,8 +141,11 @@ TEMPLATE = """<!doctype html>
     padding: 8px 16px;
     text-decoration: none;
     white-space: nowrap;
+    border: 0;
+    cursor: pointer;
   }
   .update-btn:hover, .update-btn:focus-visible { filter: brightness(1.1); outline: 2px solid var(--text); outline-offset: 2px; }
+  .update-btn:disabled { opacity: 0.6; cursor: default; }
 
   .tracker-panel {
     background: var(--surface-2);
@@ -385,7 +388,7 @@ TEMPLATE = """<!doctype html>
     </div>
     <div class="masthead-side">
       <div class="snapshot-chip">Snapshot: <b id="fetchedAt">&mdash;</b></div>
-      <a class="update-btn" href="https://github.com/DrKeyzzz/EHTSilverEagles/actions/workflows/refresh.yml" target="_blank" rel="noopener">Update scores &#8599;</a>
+      <button class="update-btn" id="updateBtn" type="button">Update scores</button>
     </div>
   </div>
 
@@ -550,6 +553,38 @@ function render() {
     container.appendChild(renderEvent(ev));
   }
 }
+
+const UPDATE_URL = "https://score-button.milnesda.workers.dev";
+const updateBtn = document.getElementById('updateBtn');
+
+async function currentStamp() {
+  const res = await fetch(location.pathname + '?t=' + Date.now(), { cache: 'no-store' });
+  const text = await res.text();
+  const m = text.match(/"fetched_at": *"([^"]*)"/);
+  return m ? m[1] : null;
+}
+
+updateBtn.addEventListener('click', async () => {
+  updateBtn.disabled = true;
+  updateBtn.textContent = 'Updating...';
+  try {
+    const before = await currentStamp();
+    const r = await fetch(UPDATE_URL, { method: 'POST' });
+    if (!r.ok) throw new Error('Worker refused');
+    for (let i = 0; i < 30; i++) {
+      await new Promise(res => setTimeout(res, 10000));
+      const now = await currentStamp();
+      if (now && now !== before) { location.reload(); return; }
+    }
+    updateBtn.textContent = 'Still working, try reloading soon';
+  } catch (e) {
+    updateBtn.textContent = 'Update failed, try again';
+  }
+  setTimeout(() => {
+    updateBtn.textContent = 'Update scores';
+    updateBtn.disabled = false;
+  }, 8000);
+});
 
 render();
 </script>
