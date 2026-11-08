@@ -93,25 +93,58 @@ class EventDetail:
     error: str | None = None
 
 
+DATE_SECTION_RE = re.compile(r'<section class="event-date[^"]*"[^>]*data-date="(?P<date>\d{4}-\d{2}-\d{2})"')
+ROW_SPLIT_RE = re.compile(r'<div class="event-row" id="event-(?P<id>\d+)"')
+
+
+def _date_epoch(date_str: str) -> int:
+    # Noon Eastern (approx) on the event day; detail page supplies the real time.
+    d = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=16, tzinfo=timezone.utc)
+    return int(d.timestamp())
+
+
 def fetch_event_list() -> list[EventSummary]:
     html_text = _fetch(EVENTS_URL)
     events = []
-    for block in CARD_SPLIT_RE.split(html_text)[1:]:
-        id_m = CARD_ID_RE.match(block)
-        name_m = CARD_NAME_RE.search(block)
-        loc_m = CARD_LOC_RE.search(block)
-        if not (id_m and name_m and loc_m):
-            continue
-        past_m = CARD_PAST_RE.search(block)
-        events.append(
-            EventSummary(
+    if 'data-time="' in html_text and CARD_SPLIT_RE.search(html_text):
+        # Old USBands layout (before Nov 2026).
+        for block in CARD_SPLIT_RE.split(html_text)[1:]:
+            id_m = CARD_ID_RE.match(block)
+            name_m = CARD_NAME_RE.search(block)
+            loc_m = CARD_LOC_RE.search(block)
+            if not (id_m and name_m and loc_m):
+                continue
+            past_m = CARD_PAST_RE.search(block)
+            events.append(EventSummary(
                 id=int(id_m.group("id")),
                 name=_clean(re.sub(r"<[^>]+>", "", name_m.group("name"))),
                 location=_clean(loc_m.group("location")),
                 epoch=int(id_m.group("epoch")),
                 is_past=bool(past_m and past_m.group("past")),
-            )
-        )
+            ))
+        return events
+
+    # New layout: events grouped under <section data-date="YYYY-MM-DD">.
+    sections = DATE_SECTION_RE.split(html_text)
+    # split yields [pre, date1, body1, date2, body2, ...]
+    for i in range(1, len(sections) - 1, 2):
+        date_str, body = sections[i], sections[i + 1]
+        epoch = _date_epoch(date_str)
+        parts = ROW_SPLIT_RE.split(body)
+        for j in range(1, len(parts) - 1, 2):
+            ev_id, block = parts[j], parts[j + 1]
+            name_m = CARD_NAME_RE.search(block)
+            loc_m = CARD_LOC_RE.search(block)
+            if not (name_m and loc_m):
+                continue
+            past_m = CARD_PAST_RE.search(block)
+            events.append(EventSummary(
+                id=int(ev_id),
+                name=_clean(re.sub(r"<[^>]+>", "", name_m.group("name"))),
+                location=_clean(loc_m.group("location")),
+                epoch=epoch,
+                is_past=bool(past_m and past_m.group("past")),
+            ))
     return events
 
 
@@ -190,6 +223,11 @@ def fetch_nj_events() -> dict:
     """
     all_events = fetch_event_list()
     nj_events = [e for e in all_events if is_nj(e)]
+    if not nj_events:
+        raise SystemExit(
+            f"Found {len(all_events)} events but 0 in NJ. usbands.org layout probably "
+            "changed; refusing to overwrite the page with an empty snapshot."
+        )
 
     details = [fetch_event_detail(e) for e in nj_events]
     details.sort(key=lambda d: d.epoch)
