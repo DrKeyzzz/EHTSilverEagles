@@ -479,7 +479,11 @@ function renderEvent(ev) {
 }
 
 function normDivision(name) {
-  return name.trim().toLowerCase().replace(/\\s+/g, ' ');
+  let n = name.trim().toLowerCase().replace(/\\s+/g, ' ');
+  // Championships split classes into sponsor divisions, e.g. "IV Open Selmer Division".
+  const m = n.match(/^(i|ii|iii|iv|v|vi) (open|a)\\b/);
+  if (m) n = m[2] + ' - group ' + m[1];
+  return n;
 }
 
 function buildTrackerRows() {
